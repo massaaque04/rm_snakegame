@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Cobrinha</title>
+    <style>
+        .game-container {
+            text-align: center;
+        }
+
+        #quadro {
+            border: 2px solid #000;
+            background: #ffc;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #333;
+        }
+
+        .game-over {
+            font-size: 32px;
+            color: red;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.7.1.slim.js"
+        integrity="sha256-UgvvN8vBkgO0luPSUl2s8TIlOSYRoGFAX4jlCIm9Adc=" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="game-container">
+        <div class="score">Pontos: <span id="pontuacao">0</span></div>
+        <canvas id="quadro" width="400" height="400"></canvas>
+        <div id="game-over-message" class="game-over" style="display: none;">GAME OVER!</div>
+    </div>
+
+    <script>
+        var canvas = $("#quadro")[0];
+        var ctx = canvas.getContext("2d");
+
+        var colisao = false;
+        var gameOver = false;
+        var pontuacao = 0;
+
+        var snake = [];
+
+        var comida = {
+            "vx": 0,
+            "vy": 0,
+            "x": canvas.width / 2,
+            "y": canvas.height / 2,
+            "l": 20,
+            "a": 20,
+            "cor": "pink",
+
+            atualiza: function () {
+                this.x += this.vx;
+                this.y += this.vy;
+            },
+
+            desenharObjeto: function () {
+                ctx.fillStyle = this.cor;
+                ctx.fillRect(this.x, this.y, this.l, this.a);
+            },
+
+            posicionarAleatoriamente: function () {
+                this.x = Math.random() * (canvas.width - this.l - 40) + 20;
+                this.y = Math.random() * (canvas.height - this.a - 40) + 20;
+            }
+        }
+
+        function detectaColisao(o1, o2) {
+            var top1 = o1.y;
+            var top2 = o2.y;
+            var esq1 = o1.x;
+            var esq2 = o2.x;
+            var dir1 = o1.x + o1.l;
+            var dir2 = o2.x + o2.l;
+            var base1 = o1.y + o1.a;
+            var base2 = o2.y + o2.a;
+
+            if (base1 > top2 && dir1 > esq2 && base2 > top1 && dir2 > esq1) {
+                colisao = true;
+
+                pontuacao++;
+                $("#pontuacao").text(pontuacao);
+                comida.posicionarAleatoriamente();
+            } else {
+                colisao = false;
+            }
+        }
+
+        function detectaLimite() {
+            if (snake[0].x < 0 || snake[0].y < 0 ||
+                snake[0].x + snake[0].l > canvas.width ||
+                snake[0].y + snake[0].a > canvas.height) {
+
+                gameOver = true;
+                snake[0].vx = 0;
+                snake[0].vy = 0;
+                $("#game-over-message").show();
+
+                setTimeout(function () {
+                    reiniciarJogo();
+                }, 3000);
+            }
+        }
+
+        function reiniciarJogo() {
+            gameOver = false;
+            colisao = false;
+            pontuacao = 0;
+
+            snake[0].x = 50;
+            snake[0].y = 50;
+            snake[0].vx = 0;
+            snake[0].vy = 0;
+
+            comida.posicionarAleatoriamente();
+
+            $("#pontuacao").text(pontuacao);
+            $("#game-over-message").hide();
+        }
+
+        function desenharTela() {
+            apagarTela();
+
+            //(nova função) objeto segue atras da cabeça (ultima colisao)
+
+            snake[0].atualiza();
+
+            detectaColisao(snake[0], comida);
+            //cria objeto quando atualizar
+            if(colisao){
+                snake.push(criaItemSnake());
+
+            }
+
+            snake[0].desenharObjeto();
+            comida.desenharObjeto();
+
+            requestAnimationFrame(desenharTela);
+        }
+
+        function apagarTela() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function criaItemSnake() {
+            return {
+                "vx": 0,
+                "vy": 0,
+                "x": 50,
+                "y": 50,
+                "l": 20,
+                "a": 20,
+                "cor": "blue",
+                atualiza: function () {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                },
+                desenharObjeto: function () {
+                    if (colisao) {
+                        comida.x = Math.random() * (canvas.width - comida.l);
+                        comida.y = Math.random() * (canvas.height - comida.a);
+
+                    }
+                    else {
+                        ctx.fillStyle = this.cor;
+                    }
+                    ctx.fillRect(this.x, this.y, this.l, this.a);
+                }
+            };
+        }
+        snake.push(criaItemSnake());
+        comida.posicionarAleatoriamente();
+        desenharTela();
+
+        $(window).keydown(function (event) {
+            if (!gameOver) {
+                if (event.which == 37) { // Seta esquerda
+                    snake[0].vx = -3; // Velocidade para a esquerda
+                    snake[0].vy = 0;  // Para movimento vertical
+                }
+                if (event.which == 39) { // Seta direita
+                    snake[0].vx = 3;  // Velocidade para a direita
+                    snake[0].vy = 0;  // Para movimento vertical
+                }
+                if (event.which == 38) { // Seta cima
+                    snake[0].vy = -3; // Velocidade para cima
+                    snake[0].vx = 0;  // Para movimento horizontal
+                }
+                if (event.which == 40) { // Seta baixo
+                    snake[0].vy = 3;  // Velocidade para baixo
+                    snake[0].vx = 0;  // Para movimento horizontal
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
