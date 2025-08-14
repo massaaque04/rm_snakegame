@@ -39,32 +39,24 @@
     <div class="game-container">
         <div class="score">Pontos: <span id="pontuacao">0</span></div>
         <canvas id="quadro" width="400" height="400"></canvas>
-        <div id="game-over-message" class="game-over" style="display: none;">GAME OVER!</div>
+        <div id="game-over-message" class="game-over" style="display: none;">game over!</div>
     </div>
 
     <script>
         var canvas = $("#quadro")[0];
         var ctx = canvas.getContext("2d");
 
-        var colisao = false;
         var gameOver = false;
         var pontuacao = 0;
-
         var snake = [];
+        var tamanhoQuadrado = 20;
 
         var comida = {
-            "vx": 0,
-            "vy": 0,
-            "x": canvas.width / 2,
-            "y": canvas.height / 2,
-            "l": 20,
-            "a": 20,
+            "x": 0,
+            "y": 0,
+            "l": 15,
+            "a": 15,
             "cor": "pink",
-
-            atualiza: function () {
-                this.x += this.vx;
-                this.y += this.vy;
-            },
 
             desenharObjeto: function () {
                 ctx.fillStyle = this.cor;
@@ -72,135 +64,163 @@
             },
 
             posicionarAleatoriamente: function () {
-                this.x = Math.random() * (canvas.width - this.l - 40) + 20;
-                this.y = Math.random() * (canvas.height - this.a - 40) + 20;
+                // posiciona a comida em uma grade para alinhar com a cobra
+                this.x = Math.floor(Math.random() * (canvas.width / tamanhoQuadrado)) * tamanhoQuadrado;
+                this.y = Math.floor(Math.random() * (canvas.height / tamanhoQuadrado)) * tamanhoQuadrado;
             }
         }
 
-        function detectaColisao(o1, o2) {
-            var top1 = o1.y;
-            var top2 = o2.y;
-            var esq1 = o1.x;
-            var esq2 = o2.x;
-            var dir1 = o1.x + o1.l;
-            var dir2 = o2.x + o2.l;
-            var base1 = o1.y + o1.a;
-            var base2 = o2.y + o2.a;
-
-            if (base1 > top2 && dir1 > esq2 && base2 > top1 && dir2 > esq1) {
-                colisao = true;
-
-                pontuacao++;
-                $("#pontuacao").text(pontuacao);
-                comida.posicionarAleatoriamente();
-            } else {
-                colisao = false;
-            }
+        function criaSegmentoSnake(x, y) {
+            return {
+                "x": x,
+                "y": y,
+                "l": tamanhoQuadrado,
+                "a": tamanhoQuadrado,
+                "cor": "blue",
+                
+                desenharObjeto: function () {
+                    ctx.fillStyle = this.cor;
+                    ctx.fillRect(this.x, this.y, this.l, this.a);
+                   
+                }
+            };
         }
 
-        function detectaLimite() {
-            if (snake[0].x < 0 || snake[0].y < 0 ||
-                snake[0].x + snake[0].l > canvas.width ||
-                snake[0].y + snake[0].a > canvas.height) {
-
-                gameOver = true;
-                snake[0].vx = 0;
-                snake[0].vy = 0;
-                $("#game-over-message").show();
-
-                setTimeout(function () {
-                    reiniciarJogo();
-                }, 3000);
-            }
-        }
-
-        function reiniciarJogo() {
-            gameOver = false;
-            colisao = false;
-            pontuacao = 0;
-
-            snake[0].x = 50;
-            snake[0].y = 50;
-            snake[0].vx = 0;
-            snake[0].vy = 0;
-
+        function inicializarJogo() {
+            snake = [];
+            snake.push(criaSegmentoSnake(200, 200));
+            
+            // Direção inicial
+            snake.direcaoX = 0;
+            snake.direcaoY = 0;
+            
             comida.posicionarAleatoriamente();
-
+            pontuacao = 0;
+            gameOver = false;
             $("#pontuacao").text(pontuacao);
             $("#game-over-message").hide();
         }
 
-        function desenharTela() {
-            apagarTela();
+        function detectaColisaoComida() {
+            var cabeca = snake[0];
+            if (cabeca.x === comida.x && cabeca.y === comida.y) {
+                pontuacao++;
+                $("#pontuacao").text(pontuacao);
+                
+                // Adiciona um novo segmento no final da cobra
+                var ultimoSegmento = snake[snake.length - 1];
+                snake.push(criaSegmentoSnake(ultimoSegmento.x, ultimoSegmento.y));
+                
+                comida.posicionarAleatoriamente();
+                return true;
+            }
+            return false;
+        }
 
-            //(nova função) objeto segue atras da cabeça (ultima colisao)
+        function detectaColisaoConsigo() {
+            var cabeca = snake[0];
+            // Verifica se a cabeça colidiu com algum segmento do corpo
+            for (var i = 1; i < snake.length; i++) {
+                if (cabeca.x === snake[i].x && cabeca.y === snake[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-            snake[0].atualiza();
+        function detectaLimite() {
+            var cabeca = snake[0];
+            if (cabeca.x < 0 || cabeca.y < 0 ||
+                cabeca.x >= canvas.width || cabeca.y >= canvas.height) {
+                return true;
+            }
+            return false;
+        }
 
-            detectaColisao(snake[0], comida);
-            //cria objeto quando atualizar
-            if(colisao){
-                snake.push(criaItemSnake());
-
+        function moverSnake() {
+            if (snake.direcaoX === 0 && snake.direcaoY === 0) {
+                return; // Cobra não está se movendo
             }
 
-            snake[0].desenharObjeto();
+            // Move cada segmento para a posição do segmento anterior
+            for (var i = snake.length - 1; i > 0; i--) {
+                snake[i].x = snake[i - 1].x;
+                snake[i].y = snake[i - 1].y;
+            }
+
+            // Move a cabeça na direção atual
+            snake[0].x += snake.direcaoX * tamanhoQuadrado;
+            snake[0].y += snake.direcaoY * tamanhoQuadrado;
+        }
+
+        function desenharTela() {
+            if (gameOver) {
+                return;
+            }
+
+            apagarTela();
+
+            moverSnake();
+
+            // Verifica colisões
+            if (detectaLimite() || detectaColisaoConsigo()) {
+                gameOver = true;
+                $("#game-over-message").show();
+                
+                setTimeout(function () {
+                    inicializarJogo();
+                }, 3000);
+                return;
+            }
+
+            detectaColisaoComida();
+
+            for (var i = 0; i < snake.length; i++) {
+                snake[i].desenharObjeto();
+            }
+
+            // Desenha a comida
             comida.desenharObjeto();
 
-            requestAnimationFrame(desenharTela);
+            setTimeout(function() {
+                requestAnimationFrame(desenharTela);}, 150); // Controla a velocidade do jogo
         }
 
         function apagarTela() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        function criaItemSnake() {
-            return {
-                "vx": 0,
-                "vy": 0,
-                "x": 50,
-                "y": 50,
-                "l": 20,
-                "a": 20,
-                "cor": "blue",
-                atualiza: function () {
-                    this.x += this.vx;
-                    this.y += this.vy;
-                },
-                desenharObjeto: function () {
-                    if (colisao) {
-                        comida.x = Math.random() * (canvas.width - comida.l);
-                        comida.y = Math.random() * (canvas.height - comida.a);
-
-                    }
-                    else {
-                        ctx.fillStyle = this.cor;
-                    }
-                    ctx.fillRect(this.x, this.y, this.l, this.a);
-                }
-            };
-        }
-        snake.push(criaItemSnake());
-        comida.posicionarAleatoriamente();
+        // Inicializa o jogo
+        inicializarJogo();
         desenharTela();
 
         $(window).keydown(function (event) {
             if (!gameOver) {
-                if (event.which == 37) { // Seta esquerda
-                    snake[0].vx = -3; // Velocidade para a esquerda
-                    snake[0].vy = 0;  // Para movimento vertical
-                }
-                if (event.which == 39) { // Seta direita
-                    snake[0].vx = 3;  // Velocidade para a direita
-                    snake[0].vy = 0;  // Para movimento vertical
-                }
-                if (event.which == 38) { // Seta cima
-                    snake[0].vy = -3; // Velocidade para cima
-                    snake[0].vx = 0;  // Para movimento horizontal
-                }
-                if (event.which == 40) { // Seta baixo
-                    snake[0].vy = 3;  // Velocidade para baixo
-                    snake[0].vx = 0;  // Para movimento horizontal
+                switch(event.which) {
+                    case 37: // Seta esquerda
+                        if (snake.direcaoX !== 1) { // Impede movimento contrário
+                            snake.direcaoX = -1;
+                            snake.direcaoY = 0;
+                        }
+                        break;
+                    case 39: // Seta direita
+                        if (snake.direcaoX !== -1) { // Impede movimento contrário
+                            snake.direcaoX = 1;
+                            snake.direcaoY = 0;
+                        }
+                        break;
+                    case 38: // Seta cima
+                        if (snake.direcaoY !== 1) { // Impede movimento contrário
+                            snake.direcaoX = 0;
+                            snake.direcaoY = -1;
+                        }
+                        break;
+                    case 40: // Seta baixo
+                        if (snake.direcaoY !== -1) { // Impede movimento contrário
+                            snake.direcaoX = 0;
+                            snake.direcaoY = 1;
+                        }
+                        break;
                 }
             }
         });
